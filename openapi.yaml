@@ -84,7 +84,32 @@ paths:
                     type: string
                     example: "/api/docs"
 
-  # API Endpoints (all under /api/)
+  # Health check endpoint
+  /health:
+    get:
+      summary: "Health check"
+      description: "Check if the API is running and healthy"
+      operationId: "healthCheck"
+      responses:
+        '200':
+          description: "API is healthy"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: "API is running"
+                  version:
+                    type: string
+                    example: "1.0.0"
+                  timestamp:
+                    type: string
+                    format: date-time
+                    example: "2024-01-01T00:00:00.000Z"
+
+  # Authentication Endpoints
   /auth/register:
     post:
       tags:
@@ -130,7 +155,13 @@ paths:
               schema:
                 $ref: '#/components/schemas/RegisterResponse'
         '400':
-          description: "Validation error or duplicate data"
+          description: "Validation error or missing required fields"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: "Wallet address or email already registered"
           content:
             application/json:
               schema:
@@ -183,6 +214,132 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
 
+  /auth/validate-wallet/{walletAddress}:
+    get:
+      tags:
+        - Authentication
+      summary: "Validate wallet address format"
+      description: |
+        Validate if a Stellar wallet address has the correct format.
+        
+        **Validation rules:**
+        - Must be exactly 56 characters long
+        - Must start with 'G'
+        - Must contain only valid Stellar characters (A-Z, 2-7)
+      operationId: "validateWalletFormat"
+      parameters:
+        - in: path
+          name: walletAddress
+          required: true
+          schema:
+            type: string
+            minLength: 56
+            maxLength: 56
+          description: "Stellar wallet address to validate"
+          example: "GXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
+      responses:
+        '200':
+          description: "Wallet validation result"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WalletValidationResponse'
+        '400':
+          description: "Missing wallet address"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: "Internal server error"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/check-wallet/{walletAddress}:
+    get:
+      tags:
+        - Authentication
+      summary: "Check wallet availability"
+      description: |
+        Check if a wallet address is available for registration.
+        
+        **Returns:**
+        - `true` if wallet is available
+        - `false` if wallet is already registered
+      operationId: "checkWalletAvailability"
+      parameters:
+        - in: path
+          name: walletAddress
+          required: true
+          schema:
+            type: string
+            minLength: 56
+            maxLength: 56
+          description: "Stellar wallet address to check"
+          example: "GXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
+      responses:
+        '200':
+          description: "Wallet availability check result"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WalletAvailabilityResponse'
+        '400':
+          description: "Missing wallet address or validation error"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: "Internal server error"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/check-email/{email}:
+    get:
+      tags:
+        - Authentication
+      summary: "Check email availability"
+      description: |
+        Check if an email address is available for registration.
+        
+        **Returns:**
+        - `true` if email is available
+        - `false` if email is already registered
+      operationId: "checkEmailAvailability"
+      parameters:
+        - in: path
+          name: email
+          required: true
+          schema:
+            type: string
+            format: email
+          description: "Email address to check"
+          example: "juan.perez@email.com"
+      responses:
+        '200':
+          description: "Email availability check result"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmailAvailabilityResponse'
+        '400':
+          description: "Missing email or validation error"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: "Internal server error"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
   /auth/profile:
     get:
       tags:
@@ -206,6 +363,117 @@ paths:
                 $ref: '#/components/schemas/ProfileResponse'
         '401':
           description: "Invalid or expired token"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: "Internal server error"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/validate-token:
+    post:
+      tags:
+        - Authentication
+      summary: "Validate JWT token"
+      description: |
+        Validate if a JWT token is still valid and return user information.
+        
+        **Requirements:**
+        - Valid JWT token in Authorization header
+      operationId: "validateToken"
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: "Token is valid"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenValidationResponse'
+        '401':
+          description: "Invalid or expired token"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: "Internal server error"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/refresh-token:
+    post:
+      tags:
+        - Authentication
+      summary: "Refresh JWT token"
+      description: |
+        Refresh an existing JWT token to extend its validity.
+        
+        **Requirements:**
+        - Valid JWT token in Authorization header
+      operationId: "refreshToken"
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: "Token refreshed successfully"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenRefreshResponse'
+        '401':
+          description: "Invalid or expired token"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: "Internal server error"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/logout:
+    post:
+      tags:
+        - Authentication
+      summary: "Logout user"
+      description: |
+        Logout a user by invalidating their JWT token.
+        
+        **Requirements:**
+        - Valid JWT token in Authorization header
+      operationId: "logout"
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: "Logout successful"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LogoutResponse'
+        '400':
+          description: "Invalid logout request"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: "Invalid or expired token"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: "Internal server error"
           content:
             application/json:
               schema:
@@ -293,26 +561,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
 
-  /auth/protected:
-    get:
-      summary: "Access a protected route"
-      operationId: "protectedRoute"
-      security:
-        - bearerAuth: []
-      responses:
-        '200':
-          description: "Protected resource accessed successfully"
-          content:
-            text/plain:
-              schema:
-                type: string
-        '401':
-          description: "Unauthorized"
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-
+  # Project and Organization Endpoints (existing)
   /organizations/{organizationId}/projects:
     get:
       summary: "Get all projects by organization ID"
@@ -418,6 +667,7 @@ paths:
 
 components:
   schemas:
+    # Project Schemas (existing)
     CreateProject:
       type: object
       required:
@@ -442,8 +692,6 @@ components:
         startDate:
           type: string
           format: date
-
-
 
     Project:
       type: object
@@ -616,6 +864,94 @@ components:
         user:
           $ref: '#/components/schemas/UserProfile'
 
+    # Wallet Validation Schemas
+    WalletValidationResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        isValid:
+          type: boolean
+          description: "Whether the wallet address format is valid"
+          example: true
+        errors:
+          type: array
+          items:
+            type: string
+          description: "List of validation errors (empty if valid)"
+          example: []
+
+    WalletAvailabilityResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        available:
+          type: boolean
+          description: "Whether the wallet address is available for registration"
+          example: true
+        message:
+          type: string
+          description: "Human-readable message about availability"
+          example: "Wallet address is available"
+
+    EmailAvailabilityResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        available:
+          type: boolean
+          description: "Whether the email address is available for registration"
+          example: true
+        message:
+          type: string
+          description: "Human-readable message about availability"
+          example: "Email is available"
+
+    # Token Management Schemas
+    TokenValidationResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: "Token is valid"
+        user:
+          $ref: '#/components/schemas/UserProfile'
+
+    TokenRefreshResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: "Token refreshed successfully"
+        token:
+          type: string
+          description: "New JWT token"
+          example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+        user:
+          $ref: '#/components/schemas/UserProfile'
+
+    LogoutResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: "Logout successful"
+
+    # Error Response Schema
     ErrorResponse:
       type: object
       properties:
@@ -626,6 +962,14 @@ components:
           type: string
           description: "Error description"
           example: "Wallet address not found"
+        code:
+          type: string
+          description: "Error code for programmatic handling"
+          example: "WALLET_NOT_FOUND"
+        details:
+          type: object
+          description: "Additional error details"
+          example: {}
         errors:
           type: array
           items:
